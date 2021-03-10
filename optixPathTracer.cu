@@ -36,7 +36,9 @@
 #define EPS     1.19209290E-07F
 #define TWO_PI  6.28318530717959f       //2*pi
 
-
+const unsigned int WIDTH = 556;
+const unsigned int HEIGHT = 549;
+const unsigned int DEPTH = 560;
 
 extern "C" {
     __constant__ Params params;
@@ -294,7 +296,6 @@ extern "C" __global__ void __raygen__rg()
     const uint3  idx = optixGetLaunchIndex();
     const int    subframe_index = params.subframe_index;
 
-    // seed values ?
     unsigned int seed = tea<4>(idx.y * w + idx.x, subframe_index);
     unsigned int seed1 = tea<4>((idx.y * w + idx.x) + 1, subframe_index);
     unsigned int seed2 = tea<4>((idx.y * w + idx.x) + 2, subframe_index);
@@ -409,6 +410,24 @@ extern "C" __global__ void __closesthit__radiance()
         prd->emitted = make_float3(0.0f);
 
 
+    // Compute the ray attenuation
+ /*
+    float distance2 = (prd->origin.x - inters_point.x) * (prd->origin.x - inters_point.x) + (prd->origin.y - inters_point.y) * (prd->origin.y - inters_point.y) + (prd->origin.z - inters_point.z) * (prd->origin.z - inters_point.z);
+    float distance = sqrt(distance2);
+
+    uint3 prev_index;
+    for (int i = 0; i < distance; i++)
+    {
+        float3 curr_location = prd->origin + i * prd->direction;
+        uint3 index = make_uint3(curr_location.x, curr_location.y, curr_location.z);
+        if (i > 0 && prev_index == index)
+            continue;
+        prev_index = index;
+
+        params.attenuation_buffer[index.x + (index.y + index.z * DEPTH) * WIDTH];
+    }
+*/
+
     unsigned int seed = prd->seed;
 
     // Ray has travelled past its scattering length
@@ -430,7 +449,7 @@ extern "C" __global__ void __closesthit__radiance()
         rand[1] = (unsigned long)prd->mc_seed[2] << 32 | prd->mc_seed[3];
 
         // value of g?
-        prd->slen = mc_next_scatter(3, rand, &prd->direction);
+        prd->slen = mc_next_scatter(0, rand, &prd->direction);
 
     }
     // Ray has not reached scatter length
@@ -461,15 +480,6 @@ extern "C" __global__ void __closesthit__radiance()
     float weight = 0.0f;
     if (nDl > 0.0f && LnDl > 0.0f)
     {
-        /*const bool occluded = traceOcclusion(
-            params.handle,
-            P,
-            L,
-            0.01f,         // tmin
-            Ldist - 0.01f  // tmax
-        );
-
-        if (!occluded)*/
         {
             const float A = length(cross(light.v1, light.v2));
             weight = nDl * LnDl * A / (M_PIf * Ldist * Ldist);

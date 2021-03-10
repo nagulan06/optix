@@ -451,6 +451,8 @@ void initLaunchParams(PathTracerState& state)
     state.params.light.normal = normalize(cross(state.params.light.v1, state.params.light.v2));
     state.params.handle = state.gas_handle;
 
+    std::cout << sizeof(Params) << std::endl;
+
     CUDA_CHECK(cudaStreamCreate(&state.stream));
     CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&state.d_params), sizeof(Params)));
 
@@ -1111,11 +1113,11 @@ int main(int argc, char* argv[])
         }
         else
         {
-            if (output_buffer_type == sutil::CUDAOutputBufferType::GL_INTEROP)
+            /*if (output_buffer_type == sutil::CUDAOutputBufferType::GL_INTEROP)
             {
                 sutil::initGLFW();  // For GL context
                 sutil::initGL();
-            }
+            }*/
 
             sutil::CUDAOutputBuffer<uchar4> output_buffer(
                 output_buffer_type,
