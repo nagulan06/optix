@@ -409,12 +409,12 @@ extern "C" __global__ void __closesthit__radiance()
     else
         prd->emitted = make_float3(0.0f);
 
+    unsigned int seed = prd->seed;
 
     // Compute the ray attenuation
- /*
     float distance2 = (prd->origin.x - inters_point.x) * (prd->origin.x - inters_point.x) + (prd->origin.y - inters_point.y) * (prd->origin.y - inters_point.y) + (prd->origin.z - inters_point.z) * (prd->origin.z - inters_point.z);
-    float distance = sqrt(distance2);
-
+    float distance = 3;// sqrt(distance2);
+    
     uint3 prev_index;
     for (int i = 0; i < distance; i++)
     {
@@ -424,11 +424,8 @@ extern "C" __global__ void __closesthit__radiance()
             continue;
         prev_index = index;
 
-        params.attenuation_buffer[index.x + (index.y + index.z * DEPTH) * WIDTH];
+        params.atten_buffer[index.x + (index.y + index.z * DEPTH) * WIDTH] = 0;
     }
-*/
-
-    unsigned int seed = prd->seed;
 
     // Ray has travelled past its scattering length
     if (prd->dist_so_far >= prd->slen)
@@ -438,12 +435,6 @@ extern "C" __global__ void __closesthit__radiance()
         const float z1 = rnd(seed);
         const float z2 = rnd(seed);
 
-        float3 w_in;
-        cosine_sample_hemisphere(z1, z2, w_in);
-        Onb onb(N);
-        onb.inverse_transform(w_in);
-        //prd->direction = w_in;
-        //prd->slen = rnd(prd->seed) * 10;
         unsigned long rand[2];
         rand[0] = (unsigned long)prd->mc_seed[0] << 32 | prd->mc_seed[1];
         rand[1] = (unsigned long)prd->mc_seed[2] << 32 | prd->mc_seed[3];

@@ -434,10 +434,10 @@ void initLaunchParams(PathTracerState& state)
         state.params.width * state.params.height * sizeof(float4)
     ));
 
-    /*CUDA_CHECK(cudaMalloc(
-        reinterpret_cast<void**>(&state.params.attenuation_buffer),
+    CUDA_CHECK(cudaMalloc(
+        reinterpret_cast<void**>(&state.params.atten_buffer),
         WIDTH * HEIGHT * DEPTH * sizeof(float)
-    ));*/
+    ));
 
     state.params.frame_buffer = nullptr;  // Will be set when output buffer is mapped
 
@@ -450,8 +450,6 @@ void initLaunchParams(PathTracerState& state)
     state.params.light.v2 = make_float3(-130.0f, 0.0f, 0.0f);
     state.params.light.normal = normalize(cross(state.params.light.v1, state.params.light.v2));
     state.params.handle = state.gas_handle;
-
-    std::cout << sizeof(Params) << std::endl;
 
     CUDA_CHECK(cudaStreamCreate(&state.stream));
     CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&state.d_params), sizeof(Params)));
@@ -977,7 +975,7 @@ void cleanupState(PathTracerState& state)
     CUDA_CHECK(cudaFree(reinterpret_cast<void*>(state.params.accum_buffer)));
     CUDA_CHECK(cudaFree(reinterpret_cast<void*>(state.d_params)));
 
-    //CUDA_CHECK(cudaFree(reinterpret_cast<void*>(state.params.attenuation_buffer)));
+    CUDA_CHECK(cudaFree(reinterpret_cast<void*>(state.params.atten_buffer)));
 }
 
 
@@ -1141,6 +1139,10 @@ int main(int argc, char* argv[])
             {
                 glfwTerminate();
             }
+
+            float* check = (float*)malloc(WIDTH * HEIGHT * DEPTH * sizeof(float));
+            CUDA_CHECK(cudaMemcpy(check, state.params.atten_buffer, WIDTH * HEIGHT * DEPTH * sizeof(float), cudaMemcpyDeviceToHost));
+            std::cout << " check: " << check[0];
         }
 
         cleanupState(state);

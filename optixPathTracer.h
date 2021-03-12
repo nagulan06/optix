@@ -62,6 +62,8 @@ struct Params
 
     ParallelogramLight     light; // TODO: make light list
     OptixTraversableHandle handle;
+
+    float* atten_buffer;
 };
 
 
