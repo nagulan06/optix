@@ -32,13 +32,16 @@
 
 #include <sutil/vec_math.h>
 #include <cuda/helpers.h>
+#include <cuda_runtime.h>
+
+//#include <stdio.h>
 
 #define EPS     1.19209290E-07F
 #define TWO_PI  6.28318530717959f       //2*pi
 
-const unsigned int WIDTH = 556;
-const unsigned int HEIGHT = 549;
-const unsigned int DEPTH = 560;
+const unsigned int WIDTH = 600;
+const unsigned int HEIGHT = 600;
+const unsigned int DEPTH = 1100;
 
 extern "C" {
     __constant__ Params params;
@@ -413,9 +416,10 @@ extern "C" __global__ void __closesthit__radiance()
 
     // Compute the ray attenuation
     float distance2 = (prd->origin.x - inters_point.x) * (prd->origin.x - inters_point.x) + (prd->origin.y - inters_point.y) * (prd->origin.y - inters_point.y) + (prd->origin.z - inters_point.z) * (prd->origin.z - inters_point.z);
-    float distance = 3;// sqrt(distance2);
+    float distance = sqrt(distance2);
     
     uint3 prev_index;
+    int change_color = 1;
     for (int i = 0; i < distance; i++)
     {
         float3 curr_location = prd->origin + i * prd->direction;
@@ -424,7 +428,14 @@ extern "C" __global__ void __closesthit__radiance()
             continue;
         prev_index = index;
 
-        params.atten_buffer[index.x + (index.y + index.z * DEPTH) * WIDTH] = 0;
+        if (index.x > WIDTH || index.y > HEIGHT || index.z > DEPTH)
+        {
+            change_color = 0;
+            printf("X: %d, Y: %d, Z: %d \n", index.x, index.y, index.z);
+        }
+
+        params.atten_buffer[index.x + ((index.y + (index.z * HEIGHT)) * WIDTH)] = 0;
+        //params.atten_buffer[index.x + (index.y * WIDTH)] = 0;
     }
 
     // Ray has travelled past its scattering length
@@ -451,7 +462,9 @@ extern "C" __global__ void __closesthit__radiance()
     }
 
     {
-        prd->attenuation *= rt_data->diffuse_color;
+        {
+            prd->attenuation *= rt_data->diffuse_color;
+        }
         prd->countEmitted = false;
     }
 
@@ -469,11 +482,11 @@ extern "C" __global__ void __closesthit__radiance()
     const float  LnDl = -dot(light.normal, L);
 
     float weight = 0.0f;
-    if (nDl > 0.0f && LnDl > 0.0f)
+    if (change_color && nDl > 0.0f && LnDl > 0.0f)
     {
         {
             const float A = length(cross(light.v1, light.v2));
-            weight = nDl * LnDl * A / (M_PIf * Ldist * Ldist);
+            weight = 3 * nDl * LnDl * A / (M_PIf * Ldist * Ldist);
         }
     }
 

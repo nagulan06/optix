@@ -48,8 +48,6 @@ struct Params
     unsigned int subframe_index;
     float4*      accum_buffer;
     uchar4*      frame_buffer;
-
-    //float* attenuation_buffer;
    
     unsigned int width;
     unsigned int height;
@@ -83,4 +81,5 @@ struct HitGroupData
     float3  emission_color;
     float3  diffuse_color;
     float4* vertices;
+ 
 };
