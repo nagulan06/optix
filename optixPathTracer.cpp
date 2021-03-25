@@ -323,6 +323,21 @@ const std::array<float3, MAT_COUNT> g_diffuse_colors =
     { 0.50f, 0.00f, 0.00f }
 } };
 
+const std::array<float, MAT_COUNT> mc_medium_id =
+{ { 
+    0,
+    1,
+    2,
+    3
+} };
+
+const std::array<float, MAT_COUNT> mc_g =
+{ {
+    0,
+    1,
+    2,
+    3
+} };
 
 //------------------------------------------------------------------------------
 //
@@ -931,6 +946,8 @@ void createSBT(PathTracerState& state)
             OPTIX_CHECK(optixSbtRecordPackHeader(state.radiance_hit_group, &hitgroup_records[sbt_idx]));
             hitgroup_records[sbt_idx].data.emission_color = g_emission_colors[i];
             hitgroup_records[sbt_idx].data.diffuse_color = g_diffuse_colors[i];
+            hitgroup_records[sbt_idx].data.medium_id_down = mc_g[i];
+            hitgroup_records[sbt_idx].data.medium_id_up = mc_medium_id[i];
             hitgroup_records[sbt_idx].data.vertices = reinterpret_cast<float4*>(state.d_vertices);
         }
 

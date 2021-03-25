@@ -414,29 +414,10 @@ extern "C" __global__ void __closesthit__radiance()
 
     unsigned int seed = prd->seed;
 
-    // Compute the ray attenuation
-    float distance2 = (prd->origin.x - inters_point.x) * (prd->origin.x - inters_point.x) + (prd->origin.y - inters_point.y) * (prd->origin.y - inters_point.y) + (prd->origin.z - inters_point.z) * (prd->origin.z - inters_point.z);
-    float distance = sqrt(distance2);
-    
-    uint3 prev_index;
-    int change_color = 1;
-    for (int i = 0; i < distance; i++)
-    {
-        float3 curr_location = prd->origin + i * prd->direction;
-        uint3 index = make_uint3(curr_location.x, curr_location.y, curr_location.z);
-        if (i > 0 && prev_index == index)
-            continue;
-        prev_index = index;
+    float3 prev_origin = prd->origin;
 
-        if (index.x > WIDTH || index.y > HEIGHT || index.z > DEPTH)
-        {
-            change_color = 0;
-            printf("X: %d, Y: %d, Z: %d \n", index.x, index.y, index.z);
-        }
-
-        params.atten_buffer[index.x + ((index.y + (index.z * HEIGHT)) * WIDTH)] = 0;
-        //params.atten_buffer[index.x + (index.y * WIDTH)] = 0;
-    }
+    // CHECK g and medium ID
+    //printf("g: %f , ID: %f \n", rt_data->g, rt_data->medium_id);
 
     // Ray has travelled past its scattering length
     if (prd->dist_so_far >= prd->slen)
@@ -458,7 +439,31 @@ extern "C" __global__ void __closesthit__radiance()
     else
     {
         prd->origin = inters_point;
-        prd->dist_so_far += dist_travelled;
+        prd->dist_so_far += dist_travelled;  // TODO: scattering coefficient
+    }
+
+    // Compute the ray attenuation
+    float distance2 = (prev_origin.x - prd->origin.x) * (prev_origin.x - prd->origin.x) + (prev_origin.y - prd->origin.y) * (prev_origin.y - prd->origin.y) + (prev_origin.z - prd->origin.z) * (prev_origin.z - prd->origin.z);
+    float distance = sqrt(distance2); // TODO: 
+
+    uint3 prev_index;
+    int change_color = 1;
+    for (int i = 0; i < distance; i++)
+    {
+        float3 curr_location = prd->origin + i * prd->direction;
+        uint3 index = make_uint3(curr_location.x, curr_location.y, curr_location.z);
+        if (i > 0 && prev_index == index)
+            continue;
+        prev_index = index;
+
+        if (index.x > WIDTH || index.y > HEIGHT || index.z > DEPTH)
+        {
+            change_color = 0;
+            printf("X: %d, Y: %d, Z: %d \n", index.x, index.y, index.z);
+        }
+
+        params.atten_buffer[index.x + ((index.y + (index.z * HEIGHT)) * WIDTH)] += 0.0001;
+        //params.atten_buffer[index.x + (index.y * WIDTH)] = 0;
     }
 
     {

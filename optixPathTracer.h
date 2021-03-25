@@ -81,5 +81,7 @@ struct HitGroupData
     float3  emission_color;
     float3  diffuse_color;
     float4* vertices;
- 
+    
+    float medium_id_up;
+    float medium_id_down;
 };
