@@ -419,6 +419,8 @@ extern "C" __global__ void __closesthit__radiance()
     // CHECK g and medium ID
     //printf("g: %f , ID: %f \n", rt_data->g, rt_data->medium_id);
 
+    float atten_const = params.atten_const[rt_data->medium_id_up];
+
     // Ray has travelled past its scattering length
     if (prd->dist_so_far >= prd->slen)
     {

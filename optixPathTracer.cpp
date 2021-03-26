@@ -144,7 +144,7 @@ struct PathTracerState
 //------------------------------------------------------------------------------
 
 const int32_t TRIANGLE_COUNT = 32;
-const int32_t MAT_COUNT = 4;
+const int32_t MAT_COUNT = 3;
 
 //const uint32_t WIDTH = 557;
 //const uint32_t HEIGHT = 550;
@@ -296,11 +296,11 @@ static std::array<uint32_t, TRIANGLE_COUNT> g_mat_indices = { {
     0, 0,                          // Floor         -- white lambert
     0, 0,                          // Ceiling       -- white lambert
     0, 0,                          // Back wall     -- white lambert
-    1, 1,                          // Right wall    -- green lambert
-    2, 2,                          // Left wall     -- red lambert
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // Short block   -- white lambert
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // Tall block    -- white lambert
-    3, 3                           // Ceiling light -- emmissive
+    0, 0,                          // Right wall    -- green lambert
+    0, 0,                          // Left wall     -- red lambert
+    1, 1, 1, 1, 1, 1, 1, 1, 1, 1,  // Short block   -- white lambert
+    2, 2, 2, 2, 2, 2, 2, 2, 2, 2,  // Tall block    -- white lambert
+    0, 0                           // Ceiling light -- emmissive
 } };
 
 
@@ -309,9 +309,8 @@ const std::array<float3, MAT_COUNT> g_emission_colors =
 { {
     {  0.0f,  0.0f,  0.0f },
     {  0.0f,  0.0f,  0.0f },
-    {  0.0f,  0.0f,  0.0f },
-    { 20.0f, 20.0f,  20.0f }
-
+    {  0.0f,  0.0f,  0.0f }
+    //,{ 20.0f, 20.0f,  20.0f }
 } };
 
 
@@ -319,15 +318,28 @@ const std::array<float3, MAT_COUNT> g_diffuse_colors =
 { {
     { 0.80f, 0.80f, 0.80f },
     { 0.05f, 0.80f, 0.05f },
-    { 0.80f, 0.05f, 0.05f },
-    { 0.50f, 0.00f, 0.00f }
+    { 0.80f, 0.05f, 0.05f }
+    //,{ 0.50f, 0.00f, 0.00f }
 } };
 
-const std::array<float, MAT_COUNT> mc_medium_id =
-{ { 
+const std::array<int, MAT_COUNT> mc_medium =
+{ {
     0,
     1,
-    2,
+    2
+} };
+
+const std::array<int, MAT_COUNT> mc_medium_id_up =
+{ { 
+    -1,
+    3,
+    3
+} };
+
+const std::array<int, MAT_COUNT> mc_medium_id_down =
+{ {
+    3,
+    3,
     3
 } };
 
@@ -335,8 +347,14 @@ const std::array<float, MAT_COUNT> mc_g =
 { {
     0,
     1,
-    2,
-    3
+    2
+} };
+
+const std::array<float, MAT_COUNT> mc_atten_const =
+{ {
+    1.2,
+    1.3,
+    1.4
 } };
 
 //------------------------------------------------------------------------------
@@ -456,6 +474,34 @@ void initLaunchParams(PathTracerState& state)
     CUDA_CHECK(cudaMalloc(
         reinterpret_cast<void**>(&state.params.atten_buffer),
         WIDTH * HEIGHT * DEPTH * sizeof(float)
+    ));
+
+    CUDA_CHECK(cudaMemset(state.params.atten_buffer, 0, WIDTH * HEIGHT * DEPTH * sizeof(float)));
+
+    // Copy g and atten_const to params to be used in OptiX
+    CUDA_CHECK(cudaMalloc(
+        reinterpret_cast<void**>(&state.params.g),
+        MAT_COUNT * sizeof(float)
+    ));
+
+    size_t size_in_bytes = mc_g.size() * sizeof(float);
+    CUDA_CHECK(cudaMemcpy(
+        reinterpret_cast<void*>(state.params.g),
+        mc_g.data(), size_in_bytes,
+        cudaMemcpyHostToDevice
+    ));
+
+
+    CUDA_CHECK(cudaMalloc(
+        reinterpret_cast<void**>(&state.params.atten_const),
+        MAT_COUNT * sizeof(float)
+    ));
+
+    size_in_bytes = mc_atten_const.size() * sizeof(float);
+    CUDA_CHECK(cudaMemcpy(
+        reinterpret_cast<void*>(state.params.atten_const),
+        mc_g.data(), size_in_bytes,
+        cudaMemcpyHostToDevice
     ));
 
     state.params.frame_buffer = nullptr;  // Will be set when output buffer is mapped
@@ -630,8 +676,8 @@ void buildMeshAccel(PathTracerState& state)
     {
         OPTIX_GEOMETRY_FLAG_DISABLE_ANYHIT,
         OPTIX_GEOMETRY_FLAG_DISABLE_ANYHIT,
-        OPTIX_GEOMETRY_FLAG_DISABLE_ANYHIT,
         OPTIX_GEOMETRY_FLAG_DISABLE_ANYHIT
+        //,OPTIX_GEOMETRY_FLAG_DISABLE_ANYHIT
     };
 
     OptixBuildInput triangle_input = {};
@@ -946,8 +992,9 @@ void createSBT(PathTracerState& state)
             OPTIX_CHECK(optixSbtRecordPackHeader(state.radiance_hit_group, &hitgroup_records[sbt_idx]));
             hitgroup_records[sbt_idx].data.emission_color = g_emission_colors[i];
             hitgroup_records[sbt_idx].data.diffuse_color = g_diffuse_colors[i];
-            hitgroup_records[sbt_idx].data.medium_id_down = mc_g[i];
-            hitgroup_records[sbt_idx].data.medium_id_up = mc_medium_id[i];
+            hitgroup_records[sbt_idx].data.medium_id_down = mc_medium_id_down[i];
+            hitgroup_records[sbt_idx].data.medium_id_up = mc_medium_id_up[i];
+            hitgroup_records[sbt_idx].data.medium_id = mc_medium[i];
             hitgroup_records[sbt_idx].data.vertices = reinterpret_cast<float4*>(state.d_vertices);
         }
 

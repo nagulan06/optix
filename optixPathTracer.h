@@ -62,6 +62,8 @@ struct Params
     OptixTraversableHandle handle;
 
     float* atten_buffer;
+    float* g;
+    float* atten_const;
 };
 
 
@@ -82,6 +84,7 @@ struct HitGroupData
     float3  diffuse_color;
     float4* vertices;
     
-    float medium_id_up;
-    float medium_id_down;
+    int medium_id;
+    int medium_id_up;
+    int medium_id_down;
 };
