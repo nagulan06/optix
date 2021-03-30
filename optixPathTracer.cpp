@@ -119,6 +119,9 @@ struct PathTracerState
     CUdeviceptr                    d_gas_output_buffer = 0;  // Triangle AS memory
     CUdeviceptr                    d_vertices = 0;
 
+    CUdeviceptr                    d_g = 0;
+    CUdeviceptr                    d_atten_const = 0;
+
     OptixModule                    ptx_module = 0;
     OptixPipelineCompileOptions    pipeline_compile_options = {};
     OptixPipeline                  pipeline = 0;
@@ -145,6 +148,7 @@ struct PathTracerState
 
 const int32_t TRIANGLE_COUNT = 32;
 const int32_t MAT_COUNT = 3;
+const int32_t MAT_TYPE = 4;
 
 //const uint32_t WIDTH = 557;
 //const uint32_t HEIGHT = 550;
@@ -304,15 +308,13 @@ static std::array<uint32_t, TRIANGLE_COUNT> g_mat_indices = { {
 } };
 
 
-
 const std::array<float3, MAT_COUNT> g_emission_colors =
 { {
     {  0.0f,  0.0f,  0.0f },
     {  0.0f,  0.0f,  0.0f },
     {  0.0f,  0.0f,  0.0f }
-    //,{ 20.0f, 20.0f,  20.0f }
+    //,{ 20.0f, 20.0f, 20.0f }
 } };
-
 
 const std::array<float3, MAT_COUNT> g_diffuse_colors =
 { {
@@ -343,18 +345,20 @@ const std::array<int, MAT_COUNT> mc_medium_id_down =
     3
 } };
 
-const std::array<float, MAT_COUNT> mc_g =
+const std::array<float, MAT_TYPE> mc_g =
 { {
     0,
     1,
-    2
+    2,
+    3
 } };
 
-const std::array<float, MAT_COUNT> mc_atten_const =
+const std::array<float, MAT_TYPE> mc_atten_const =
 { {
     1.2,
     1.3,
-    1.4
+    1.4,
+    1.5
 } };
 
 //------------------------------------------------------------------------------
@@ -479,30 +483,35 @@ void initLaunchParams(PathTracerState& state)
     CUDA_CHECK(cudaMemset(state.params.atten_buffer, 0, WIDTH * HEIGHT * DEPTH * sizeof(float)));
 
     // Copy g and atten_const to params to be used in OptiX
-    CUDA_CHECK(cudaMalloc(
-        reinterpret_cast<void**>(&state.params.g),
-        MAT_COUNT * sizeof(float)
-    ));
-
     size_t size_in_bytes = mc_g.size() * sizeof(float);
+    CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&state.d_g), size_in_bytes));
     CUDA_CHECK(cudaMemcpy(
-        reinterpret_cast<void*>(state.params.g),
+        reinterpret_cast<void*>(state.d_g),
         mc_g.data(), size_in_bytes,
         cudaMemcpyHostToDevice
     ));
+    state.params.g = reinterpret_cast<float*>(state.d_g);
 
+    size_in_bytes = mc_atten_const.size() * sizeof(float);
+    CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&state.d_atten_const), size_in_bytes));
+    CUDA_CHECK(cudaMemcpy(
+        reinterpret_cast<void*>(state.d_atten_const),
+        mc_atten_const.data(), size_in_bytes,
+        cudaMemcpyHostToDevice
+    ));
+    state.params.atten_const = reinterpret_cast<float*>(state.d_atten_const);
 
-    CUDA_CHECK(cudaMalloc(
+   /* CUDA_CHECK(cudaMalloc(
         reinterpret_cast<void**>(&state.params.atten_const),
         MAT_COUNT * sizeof(float)
     ));
 
-    size_in_bytes = mc_atten_const.size() * sizeof(float);
+   
     CUDA_CHECK(cudaMemcpy(
         reinterpret_cast<void*>(state.params.atten_const),
         mc_g.data(), size_in_bytes,
         cudaMemcpyHostToDevice
-    ));
+    ));*/
 
     state.params.frame_buffer = nullptr;  // Will be set when output buffer is mapped
 

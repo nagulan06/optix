@@ -419,7 +419,11 @@ extern "C" __global__ void __closesthit__radiance()
     // CHECK g and medium ID
     //printf("g: %f , ID: %f \n", rt_data->g, rt_data->medium_id);
 
-    float atten_const = params.atten_const[rt_data->medium_id_up];
+    if (rt_data->medium_id == 2)
+    {
+        float atten_const = params.atten_const[rt_data->medium_id_up];
+        printf("const: %f \n", atten_const);
+    }
 
     // Ray has travelled past its scattering length
     if (prd->dist_so_far >= prd->slen)
@@ -433,9 +437,7 @@ extern "C" __global__ void __closesthit__radiance()
         rand[0] = (unsigned long)prd->mc_seed[0] << 32 | prd->mc_seed[1];
         rand[1] = (unsigned long)prd->mc_seed[2] << 32 | prd->mc_seed[3];
 
-        // value of g?
-        prd->slen = mc_next_scatter(0, rand, &prd->direction);
-
+        prd->slen = mc_next_scatter(params.g[rt_data->medium_id], rand, &prd->direction);
     }
     // Ray has not reached scatter length
     else
