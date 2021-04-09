@@ -324,41 +324,35 @@ const std::array<float3, MAT_COUNT> g_diffuse_colors =
     //,{ 0.50f, 0.00f, 0.00f }
 } };
 
-const std::array<int, MAT_COUNT> mc_medium =
-{ {
-    0,
-    1,
-    2
-} };
 
 const std::array<int, MAT_COUNT> mc_medium_id_up =
 { { 
-    -1,
-    3,
-    3
+    1,
+    1,
+    1
 } };
 
 const std::array<int, MAT_COUNT> mc_medium_id_down =
 { {
-    3,
-    3,
+    0,
+    2,
     3
 } };
 
 const std::array<float, MAT_TYPE> mc_g =
 { {
-    0,
-    1,
-    2,
-    3
+    0.0,
+    0.01,
+    0.02,
+    0.03
 } };
 
 const std::array<float, MAT_TYPE> mc_atten_const =
 { {
-    1.2,
-    1.3,
-    1.4,
-    1.5
+    0.1,
+    0.2,
+    0.3,
+    0.4
 } };
 
 //------------------------------------------------------------------------------
@@ -1003,7 +997,7 @@ void createSBT(PathTracerState& state)
             hitgroup_records[sbt_idx].data.diffuse_color = g_diffuse_colors[i];
             hitgroup_records[sbt_idx].data.medium_id_down = mc_medium_id_down[i];
             hitgroup_records[sbt_idx].data.medium_id_up = mc_medium_id_up[i];
-            hitgroup_records[sbt_idx].data.medium_id = mc_medium[i];
+            //hitgroup_records[sbt_idx].data.medium_id = mc_medium[i];
             hitgroup_records[sbt_idx].data.vertices = reinterpret_cast<float4*>(state.d_vertices);
         }
 
