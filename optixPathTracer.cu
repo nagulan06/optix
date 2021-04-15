@@ -69,6 +69,7 @@ struct RadiancePRD
     float        slen;
     float        dist_so_far;
     unsigned int mc_seed[4];
+    float        weight;
     //int          pad;
 };
 
@@ -331,6 +332,7 @@ extern "C" __global__ void __raygen__rg()
 
         prd.slen = rnd(seed) * 10;
         prd.dist_so_far = 0.0f;
+        prd.weight = 1.0f;
 
         int depth = 0;
         for (;; )
@@ -419,11 +421,13 @@ extern "C" __global__ void __closesthit__radiance()
     // CHECK g and medium ID
     //printf("g: %f , ID: %f \n", rt_data->g, rt_data->medium_id);
 
-    int medium_id = rt_data->medium_id_up;
-    float atten_const = params.atten_const[medium_id];
+    int medium_id = rt_data->medium_id_down;
+
+    if(dot(-ray_dir, N_0) < 0)
+        medium_id = rt_data->medium_id_up;
 
     // Ray has travelled past its scattering length
-    if (prd->dist_so_far >= prd->slen)
+    if (prd->dist_so_far >= (prd->slen / params.mu_s[medium_id]))
     {
         prd->origin = prd->origin + prd->slen;
         prd->dist_so_far = 0;
@@ -440,13 +444,13 @@ extern "C" __global__ void __closesthit__radiance()
     // Ray has not reached scatter length
     else
     {
-        prd->dist_so_far += dist_travelled;
+        prd->dist_so_far += dist_travelled * params.mu_s[medium_id]; // multiply by mu_s
         prd->origin = inters_point;
     }
 
     // Compute the ray attenuation
     float distance2 = (prev_origin.x - prd->origin.x) * (prev_origin.x - prd->origin.x) + (prev_origin.y - prd->origin.y) * (prev_origin.y - prd->origin.y) + (prev_origin.z - prd->origin.z) * (prev_origin.z - prd->origin.z);
-    float distance = sqrt(distance2); // TODO: 
+    float distance = sqrt(distance2);
 
     uint3 prev_index;
     int change_color = 1;
@@ -460,12 +464,12 @@ extern "C" __global__ void __closesthit__radiance()
 
         if (index.x > WIDTH || index.y > HEIGHT || index.z > DEPTH)
         {
-            
             printf("X: %d, Y: %d, Z: %d \n", index.x, index.y, index.z);
         }
 
-        params.atten_buffer[index.x + ((index.y + (index.z * HEIGHT)) * WIDTH)] += 0.0001;
-        //params.atten_buffer[index.x + (index.y * WIDTH)] = 0;
+        float weight_change = prd->weight * (1 - exp(-params.mu_a[medium_id]));
+        params.atten_buffer[index.x + ((index.y + (index.z * HEIGHT)) * WIDTH)] += weight_change;
+        prd->weight -= weight_change;
     }
 
     {

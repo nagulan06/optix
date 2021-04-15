@@ -65,6 +65,7 @@ struct Params
     float* g;
     float* atten_const;
     float* mu_s;
+    float* mu_a;
 };
 
 

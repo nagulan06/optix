@@ -121,6 +121,8 @@ struct PathTracerState
 
     CUdeviceptr                    d_g = 0;
     CUdeviceptr                    d_atten_const = 0;
+    CUdeviceptr                    d_mu_a = 0;
+    CUdeviceptr                    d_mu_s = 0;
 
     OptixModule                    ptx_module = 0;
     OptixPipelineCompileOptions    pipeline_compile_options = {};
@@ -349,10 +351,26 @@ const std::array<float, MAT_TYPE> mc_g =
 
 const std::array<float, MAT_TYPE> mc_atten_const =
 { {
-    0.1,
-    0.2,
-    0.3,
-    0.4
+    0.01,
+    0.02,
+    0.03,
+    0.04
+} };
+
+const std::array<float, MAT_TYPE> mu_a =
+{ {
+    0.5,
+    1,
+    1.5,
+    2
+} };
+
+const std::array<float, MAT_TYPE> mu_s =
+{ {
+    0.8,
+    0.5,
+    1.2,
+    1.7
 } };
 
 //------------------------------------------------------------------------------
@@ -494,6 +512,26 @@ void initLaunchParams(PathTracerState& state)
         cudaMemcpyHostToDevice
     ));
     state.params.atten_const = reinterpret_cast<float*>(state.d_atten_const);
+
+
+    size_in_bytes = mu_a.size() * sizeof(float);
+    CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&state.d_mu_a), size_in_bytes));
+    CUDA_CHECK(cudaMemcpy(
+        reinterpret_cast<void*>(state.d_mu_a),
+        mu_a.data(), size_in_bytes,
+        cudaMemcpyHostToDevice
+    ));
+    state.params.mu_a = reinterpret_cast<float*>(state.d_mu_a);
+
+
+    size_in_bytes = mu_s.size() * sizeof(float);
+    CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&state.d_mu_s), size_in_bytes));
+    CUDA_CHECK(cudaMemcpy(
+        reinterpret_cast<void*>(state.d_mu_s),
+        mu_s.data(), size_in_bytes,
+        cudaMemcpyHostToDevice
+    ));
+    state.params.mu_s = reinterpret_cast<float*>(state.d_mu_s);
 
    /* CUDA_CHECK(cudaMalloc(
         reinterpret_cast<void**>(&state.params.atten_const),
@@ -1213,7 +1251,27 @@ int main(int argc, char* argv[])
 
             float* check = (float*)malloc(WIDTH * HEIGHT * DEPTH * sizeof(float));
             CUDA_CHECK(cudaMemcpy(check, state.params.atten_buffer, WIDTH * HEIGHT * DEPTH * sizeof(float), cudaMemcpyDeviceToHost));
-            std::cout << " check: " << check[0];
+
+           /* FILE* fp = fopen("attenuation.bin", "wb");
+            fwrite(check, WIDTH * HEIGHT * DEPTH, sizeof(float), fp);
+            fclose(fp);
+           
+            std::ofstream OutFile("attenuation.txt", std::ios::out | std::ios::binary);
+            if (!OutFile.is_open())
+                std::cout << "attenuation.txt cannot be opened" << std::endl;
+            for (int x = 0; x < WIDTH; x++)
+            {
+                for (int y = 0; y < HEIGHT; y++)
+                {
+                    for (int z = 0; z < DEPTH; z++)
+                    {
+                        OutFile << check[x + ((y + (z * HEIGHT)) * WIDTH)] << std::endl;
+                    }
+                }
+            }
+            
+            OutFile.close();
+            */
         }
 
         cleanupState(state);
