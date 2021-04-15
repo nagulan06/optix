@@ -1252,11 +1252,11 @@ int main(int argc, char* argv[])
             float* check = (float*)malloc(WIDTH * HEIGHT * DEPTH * sizeof(float));
             CUDA_CHECK(cudaMemcpy(check, state.params.atten_buffer, WIDTH * HEIGHT * DEPTH * sizeof(float), cudaMemcpyDeviceToHost));
 
-           /* FILE* fp = fopen("attenuation.bin", "wb");
+            FILE* fp = fopen("attenuation.bin", "wb");
             fwrite(check, WIDTH * HEIGHT * DEPTH, sizeof(float), fp);
             fclose(fp);
            
-            std::ofstream OutFile("attenuation.txt", std::ios::out | std::ios::binary);
+            /*std::ofstream OutFile("attenuation.txt", std::ios::out | std::ios::binary);
             if (!OutFile.is_open())
                 std::cout << "attenuation.txt cannot be opened" << std::endl;
             for (int x = 0; x < WIDTH; x++)
