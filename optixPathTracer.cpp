@@ -1253,8 +1253,10 @@ int main(int argc, char* argv[])
             CUDA_CHECK(cudaMemcpy(check, state.params.atten_buffer, WIDTH * HEIGHT * DEPTH * sizeof(float), cudaMemcpyDeviceToHost));
 
             FILE* fp = fopen("attenuation.bin", "wb");
-            fwrite(check, WIDTH * HEIGHT * DEPTH, sizeof(float), fp);
+            fwrite(check, sizeof(float), WIDTH*HEIGHT*DEPTH, fp);
             fclose(fp);
+
+            std::cout << "value check: " << check[203456529];
            
             /*std::ofstream OutFile("attenuation.txt", std::ios::out | std::ios::binary);
             if (!OutFile.is_open())
