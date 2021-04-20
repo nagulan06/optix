@@ -39,9 +39,13 @@
 #define EPS     1.19209290E-07F
 #define TWO_PI  6.28318530717959f       //2*pi
 
-const unsigned int WIDTH = 600;
+/*const unsigned int WIDTH = 600;
 const unsigned int HEIGHT = 600;
-const unsigned int DEPTH = 1100;
+const unsigned int DEPTH = 1100;*/
+
+const unsigned int WIDTH = 400;
+const unsigned int HEIGHT = 400;
+const unsigned int DEPTH = 500;
 
 extern "C" {
     __constant__ Params params;
@@ -334,6 +338,8 @@ extern "C" __global__ void __raygen__rg()
         prd.dist_so_far = 0.0f;
         prd.weight = 1.0f;
 
+        prd.origin = ray_origin;
+
         int depth = 0;
         for (;; )
         {
@@ -406,8 +412,17 @@ extern "C" __global__ void __closesthit__radiance()
 
     const float dist_travelled = optixGetRayTmax();
     const float3 inters_point = optixGetWorldRayOrigin() + dist_travelled * ray_dir;
-
     RadiancePRD* prd = getPRD();
+
+
+    // Smaller scene 
+    // x:100-500 ; y:0-400 ; z: 300-800
+    if ( (inters_point.x > 500 || inters_point.x < 100) || (inters_point.y > 400 || inters_point.y < 0) || (inters_point.z > 800 || inters_point.z < 300) )
+    {
+        prd->radiance = make_float3(0.0, 0.0, 0.0);
+        return;
+    }
+
 
     if (prd->countEmitted)
         prd->emitted = rt_data->emission_color;
@@ -426,6 +441,31 @@ extern "C" __global__ void __closesthit__radiance()
     if(dot(-ray_dir, N_0) < 0)
         medium_id = rt_data->medium_id_up;
 
+
+    // Distance between where the ray originated to where the ray has hit the surface
+    float distance2 = (prd->origin.x - inters_point.x) * (prd->origin.x - inters_point.x) + (prd->origin.y - inters_point.y) * (prd->origin.y - inters_point.y) + (prd->origin.z - inters_point.z) * (prd->origin.z - inters_point.z);
+    float distance = sqrt(distance2);
+
+    uint3 prev_index;
+    for (int i = 0; i < distance; i += 2)
+    {
+        float3 curr_location = prd->origin + i * prd->direction;
+        uint3 index = make_uint3((curr_location.x-100), curr_location.y, (curr_location.z-300));
+        if (i > 0 && prev_index == index)
+            continue;
+        prev_index = index;
+
+        if (index.x > WIDTH || index.y > HEIGHT || index.z > DEPTH)
+        {
+            printf("X: %d, Y: %d, Z: %d \n", index.x, index.y, index.z);
+        }
+
+        float weight_change = prd->weight * (1 - exp(-params.mu_a[medium_id]));
+        params.atten_buffer[index.x + ((index.y + (index.z * HEIGHT)) * WIDTH)] += weight_change;
+        prd->weight -= weight_change;
+    }
+
+    // Update ray origin and direction
     // Ray has travelled past its scattering length
     if (prd->dist_so_far >= (prd->slen / params.mu_s[medium_id]))
     {
@@ -448,29 +488,6 @@ extern "C" __global__ void __closesthit__radiance()
         prd->origin = inters_point;
     }
 
-    // Compute the ray attenuation
-    float distance2 = (prev_origin.x - prd->origin.x) * (prev_origin.x - prd->origin.x) + (prev_origin.y - prd->origin.y) * (prev_origin.y - prd->origin.y) + (prev_origin.z - prd->origin.z) * (prev_origin.z - prd->origin.z);
-    float distance = sqrt(distance2);
-
-    uint3 prev_index;
-    int change_color = 1;
-    for (int i = 0; i < distance; i++)
-    {
-        float3 curr_location = prd->origin + i * prd->direction;
-        uint3 index = make_uint3(curr_location.x, curr_location.y, curr_location.z);
-        if (i > 0 && prev_index == index)
-            continue;
-        prev_index = index;
-
-        if (index.x > WIDTH || index.y > HEIGHT || index.z > DEPTH)
-        {
-            printf("X: %d, Y: %d, Z: %d \n", index.x, index.y, index.z);
-        }
-
-        float weight_change = prd->weight * (1 - exp(-params.mu_a[medium_id]));
-        params.atten_buffer[index.x + ((index.y + (index.z * HEIGHT)) * WIDTH)] += weight_change;
-        prd->weight -= weight_change;
-    }
 
     {
         {
@@ -493,7 +510,7 @@ extern "C" __global__ void __closesthit__radiance()
     const float  LnDl = -dot(light.normal, L);
 
     float weight = 0.0f;
-    if (change_color && nDl > 0.0f && LnDl > 0.0f)
+    if (nDl > 0.0f && LnDl > 0.0f)
     {
         {
             const float A = length(cross(light.v1, light.v2));
