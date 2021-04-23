@@ -74,6 +74,8 @@ struct RadiancePRD
     float        dist_so_far;
     unsigned int mc_seed[4];
     float        weight;
+    int          print;
+    int          depth;
     //int          pad;
 };
 
@@ -311,7 +313,7 @@ extern "C" __global__ void __raygen__rg()
 
     float3 result = make_float3(0.0f);
     int i = params.samples_per_launch;
-    do
+    //do
     {
         // The center of each pixel is at fraction (0.5,0.5)
         const float2 subpixel_jitter = make_float2(rnd(seed), rnd(seed));
@@ -320,7 +322,8 @@ extern "C" __global__ void __raygen__rg()
             (static_cast<float>(idx.x) + subpixel_jitter.x) / static_cast<float>(w),
             (static_cast<float>(idx.y) + subpixel_jitter.y) / static_cast<float>(h)
         ) - 1.0f;
-        float3 ray_direction = normalize(d.x * U + d.y * V + W);
+
+        float3 ray_direction = normalize(-0.3 * U + 0.5 * V + W); //normalize(d.x * U + d.y * V + W);
         float3 ray_origin = eye;
 
         RadiancePRD prd;
@@ -336,13 +339,16 @@ extern "C" __global__ void __raygen__rg()
 
         prd.slen = rnd(seed) * 10;
         prd.dist_so_far = 0.0f;
-        prd.weight = 1.0f;
+        prd.weight = 5.0f;
 
         prd.origin = ray_origin;
+        prd.direction = ray_direction;
 
         int depth = 0;
         for (;; )
         {
+            printf("origin: %f, %f, %f; direction: %f, %f, %f \n", ray_origin.x, ray_origin.y, ray_origin.z,
+                ray_direction.x, ray_direction.y, ray_direction.z);
             traceRadiance(
                 params.handle,
                 ray_origin,
@@ -354,15 +360,17 @@ extern "C" __global__ void __raygen__rg()
             result += prd.emitted;
             result += prd.radiance * prd.attenuation;
 
-            if (prd.done || depth >= 10) // TODO RR, variable for depth
+            if (prd.done || depth >= 5) // TODO RR, variable for depth
                 break;
 
+            // Ray origin and direction are updated from the trace
             ray_origin = prd.origin;
             ray_direction = prd.direction;
 
             ++depth;
         }
-    } while (--i);
+    } 
+    //while (--i);
 
     const uint3    launch_index = optixGetLaunchIndex();
     const unsigned int image_index = launch_index.y * params.width + launch_index.x;
@@ -414,12 +422,15 @@ extern "C" __global__ void __closesthit__radiance()
     const float3 inters_point = optixGetWorldRayOrigin() + dist_travelled * ray_dir;
     RadiancePRD* prd = getPRD();
 
+    printf("hitPoint: %f, %f, %f \n", inters_point.x, inters_point.y, inters_point.z);
 
     // Smaller scene 
     // x:100-500 ; y:0-400 ; z: 300-800
     if ( (inters_point.x > 500 || inters_point.x < 100) || (inters_point.y > 400 || inters_point.y < 0) || (inters_point.z > 800 || inters_point.z < 300) )
     {
         prd->radiance = make_float3(0.0, 0.0, 0.0);
+        printf("out of bounds \n");
+        prd->done = true;
         return;
     }
 
@@ -432,6 +443,7 @@ extern "C" __global__ void __closesthit__radiance()
     unsigned int seed = prd->seed;
 
     float3 prev_origin = prd->origin;
+    float3 prev_dir = prd->direction;
 
     // CHECK g and medium ID
     //printf("g: %f , ID: %f \n", rt_data->g, rt_data->medium_id);
@@ -441,43 +453,19 @@ extern "C" __global__ void __closesthit__radiance()
     if(dot(-ray_dir, N_0) < 0)
         medium_id = rt_data->medium_id_up;
 
-
-    // Distance between where the ray originated to where the ray has hit the surface
-    float distance2 = (prd->origin.x - inters_point.x) * (prd->origin.x - inters_point.x) + (prd->origin.y - inters_point.y) * (prd->origin.y - inters_point.y) + (prd->origin.z - inters_point.z) * (prd->origin.z - inters_point.z);
-    float distance = sqrt(distance2);
-
-    uint3 prev_index;
-    for (int i = 0; i < distance; i += 2)
-    {
-        float3 curr_location = prd->origin + i * prd->direction;
-        uint3 index = make_uint3((curr_location.x-100), curr_location.y, (curr_location.z-300));
-        if (i > 0 && prev_index == index)
-            continue;
-        prev_index = index;
-
-        if (index.x > WIDTH || index.y > HEIGHT || index.z > DEPTH)
-        {
-            printf("X: %d, Y: %d, Z: %d \n", index.x, index.y, index.z);
-        }
-
-        float weight_change = prd->weight * (1 - exp(-params.mu_a[medium_id]));
-        params.atten_buffer[index.x + ((index.y + (index.z * HEIGHT)) * WIDTH)] += weight_change;
-        prd->weight -= weight_change;
-    }
-
     // Update ray origin and direction
     // Ray has travelled past its scattering length
+
+    unsigned long rand[2];
+    rand[0] = (unsigned long)prd->mc_seed[0] << 32 | prd->mc_seed[1];
+    rand[1] = (unsigned long)prd->mc_seed[2] << 32 | prd->mc_seed[3];
     if (prd->dist_so_far >= (prd->slen / params.mu_s[medium_id]))
     {
-        prd->origin = prd->origin + prd->slen;
+        prd->origin = prd->origin + (prd->slen * prd->direction);
         prd->dist_so_far = 0;
 
         const float z1 = rnd(seed);
         const float z2 = rnd(seed);
-
-        unsigned long rand[2];
-        rand[0] = (unsigned long)prd->mc_seed[0] << 32 | prd->mc_seed[1];
-        rand[1] = (unsigned long)prd->mc_seed[2] << 32 | prd->mc_seed[3];
 
         prd->slen = mc_next_scatter(params.g[medium_id], rand, &prd->direction);
     }
@@ -486,8 +474,44 @@ extern "C" __global__ void __closesthit__radiance()
     {
         prd->dist_so_far += dist_travelled * params.mu_s[medium_id]; // multiply by mu_s
         prd->origin = inters_point;
+
+        //float slen = mc_next_scatter(params.g[medium_id], rand, &prd->direction);
     }
 
+    //printf("changed origin: %f, %f, %f ; direction: %f, %f, %f \n", prd->origin.x, prd->origin.y, prd->origin.z,
+      //  prd->direction.x, prd->direction.y, prd->direction.z);
+    // Compute the ray attenuation
+    //float distance2 = (prev_origin.x - prd->origin.x) * (prev_origin.x - prd->origin.x) + (prev_origin.y - prd->origin.y) * (prev_origin.y - prd->origin.y) + (prev_origin.z - prd->origin.z) * (prev_origin.z - prd->origin.z);
+    //float distance = sqrt(distance2);
+
+    float3 t3 = (prd->origin - prev_origin) / (prev_dir);
+    float distance = (t3.x + t3.y + t3.z) / 3;
+
+    uint3 prev_index;
+    int change_color = 1;
+    for (float i = 0; i < distance; i += 10)
+    {
+        float3 curr_location = prev_origin + i * prev_dir;
+        printf("i: %f, curr_location: %f, %f, %f; weight: %f \n", i, curr_location.x, curr_location.y, curr_location.z, prd->weight);
+        uint3 index = make_uint3(curr_location.x-100, curr_location.y, curr_location.z-300);
+        if (i > 0 && prev_index == index)
+            continue;
+        prev_index = index;
+
+        if (index.x > WIDTH || index.y > HEIGHT || index.z > DEPTH)
+        {
+            //printf("inters: %f, origin: %f, slen: %f \n", inters_point, prd->origin, prd->slen);
+            printf("X: %d, Y: %d, Z: %d \n", index.x, index.y, index.z);
+        }
+        //printf("mu_a: %f\n", params.mu_a[medium_id]);
+        float weight_change = prd->weight * (1 - exp(-params.mu_a[medium_id]));
+        params.atten_buffer[index.x + ((index.y + (index.z * HEIGHT)) * WIDTH)] += weight_change;
+        //printf("weight: %f; index: %d, %d, %d; bufferVal: %f\n", prd->weight, index.x, index.y, index.z, params.atten_buffer[index.x + ((index.y + (index.z * HEIGHT)) * WIDTH)]);
+        //printf("weight: %f \n", prd->weight);
+        prd->weight -= weight_change;
+    }
+
+    printf("======= Final weight value ========== : %f \n", prd->weight);
 
     {
         {
@@ -519,6 +543,14 @@ extern "C" __global__ void __closesthit__radiance()
     }
 
     prd->radiance += light.emission * weight;
+
+    /*traceRadiance(
+        params.handle,
+        prd->origin,
+        prd->direction,
+        0.01f,  // tmin       // TODO: smarter offset
+        1e16f,  // tmax
+        prd);*/
 }
 
 

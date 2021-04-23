@@ -366,7 +366,7 @@ const std::array<float, MAT_TYPE> mu_a =
     0.5,
     1,
     1.5,
-    2
+    0.5
 } };
 
 const std::array<float, MAT_TYPE> mu_s =
@@ -496,7 +496,7 @@ void initLaunchParams(PathTracerState& state)
         WIDTH * HEIGHT * DEPTH * sizeof(float)
     ));
 
-    CUDA_CHECK(cudaMemset(state.params.atten_buffer, 0, WIDTH * HEIGHT * DEPTH * sizeof(float)));
+    CUDA_CHECK(cudaMemset(state.params.atten_buffer, 0.0f, WIDTH * HEIGHT * DEPTH * sizeof(float)));
 
     // Copy g and atten_const to params to be used in OptiX
     size_t size_in_bytes = mc_g.size() * sizeof(float);
@@ -1101,8 +1101,8 @@ void cleanupState(PathTracerState& state)
 int main(int argc, char* argv[])
 {
     PathTracerState state;
-    state.params.width = 200;
-    state.params.height = 200;
+    state.params.width = 1;// 200;
+    state.params.height = 1;// 200;
     sutil::CUDAOutputBufferType output_buffer_type = sutil::CUDAOutputBufferType::GL_INTEROP;
 
     //
@@ -1260,7 +1260,7 @@ int main(int argc, char* argv[])
             fwrite(check, sizeof(float), WIDTH*HEIGHT*DEPTH, fp);
             fclose(fp);
 
-            std::cout << "value check: " << check[203456529];
+            //std::cout << "value check: " << check[203456529];
            
             /*std::ofstream OutFile("attenuation.txt", std::ios::out | std::ios::binary);
             if (!OutFile.is_open())
